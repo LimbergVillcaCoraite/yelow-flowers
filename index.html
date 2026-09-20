@@ -33,7 +33,7 @@ body {
   align-items: flex-end;
   justify-content: center;
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: var(--vph, 100dvh);
   background-color: var(--dark-color);
   overflow: hidden;
   perspective: 1000px;
@@ -51,7 +51,7 @@ body {
   top: 0;
   transform: translateX(-50%);
   width: 100%;
-  height: 100%;
+  height: var(--vph, 100%);
   filter: blur(0.1vmin);
   background-image: radial-gradient(
       ellipse at top,
@@ -92,7 +92,7 @@ body {
   top: 0;
   left: 0;
   width: 100%;
-  height: 100%;
+  height: var(--vph, 100%);
   pointer-events: none;
   z-index: 1;
 }
@@ -901,7 +901,7 @@ body {
 .ground {
   position: fixed;
   left: 0;
-  bottom: 0;
+  top: calc(var(--vph, 100vh) - 28vmin);
   width: 100%;
   height: 28vmin;
   z-index: 1;
@@ -920,7 +920,7 @@ body {
 .ground--fore {
   position: fixed;
   left: 0;
-  bottom: 0;
+  top: calc(var(--vph, 100vh) - 12vmin);
   width: 100%;
   height: 12vmin;
   z-index: 3;
@@ -937,7 +937,10 @@ body {
 
 .watering {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--vph, 100vh);
   z-index: 5;
   overflow: hidden;
   pointer-events: none;
@@ -967,9 +970,27 @@ body {
   box-shadow: 0 0 0.6vmin rgba(150, 220, 255, 0.35);
 }
 
+@media (max-width: 620px), (max-height: 620px) {
+  .flower__leafs::after {
+    filter: blur(4vmin);
+    opacity: 0.26;
+  }
+
+  .flower__grass__overlay {
+    filter: blur(0.9vmin);
+  }
+
+  .ground--fore {
+    filter: none;
+  }
+}
+
 .falling-leaves {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--vph, 100vh);
   z-index: 4;
   overflow: hidden;
   pointer-events: none;
@@ -1562,8 +1583,8 @@ body {
     }
 
     /* --- disco floral: espiral de Vogel (angulo aureo) sobre canvas --- */
-    function discTexture(seed) {
-      const S = 512;
+    function discTexture(seed, ligero) {
+      const S = ligero ? 320 : 512;
       const R = S / 2;
       const cv = document.createElement('canvas');
       cv.width = cv.height = S;
@@ -1578,7 +1599,7 @@ body {
       g.fillStyle = base;
       g.fillRect(0, 0, S, S);
 
-      const N = 900;
+      const N = ligero ? 520 : 900;
       const GOLDEN = Math.PI * (3 - Math.sqrt(5));
       const pitch = (R * 0.94) / Math.sqrt(N);
 
@@ -1614,7 +1635,7 @@ body {
       }
 
       /* corona de floculos tubulares amarillos en el borde del disco */
-      const ring = 240;
+      const ring = ligero ? 150 : 240;
       for (let i = 0; i < ring; i++) {
         const a = (i / ring) * Math.PI * 2 + rng() * 0.05;
         g.save();
@@ -1892,6 +1913,12 @@ body {
       const cx = rect.left + rect.width / 2;
       const cy = rect.top + rect.height / 2;
 
+      /* se mide ahora, antes de sacarla de la planta */
+      const anfitriona = el.closest('.flower');
+      const base = anfitriona
+        ? anfitriona.getBoundingClientRect().bottom
+        : window.innerHeight * 0.9;
+
       el.style.animation = 'none';
       el.style.position = 'absolute';
       el.style.left = (cx - w / 2).toFixed(1) + 'px';
@@ -1913,7 +1940,9 @@ body {
       });
 
       const rng = mulberry32((Date.now() & 0xffff) ^ Math.floor(Math.random() * 65536));
-      const drop = Math.max(window.innerHeight * (0.86 + rng() * 0.06) - cy, 12);
+      const vminPx = Math.min(window.innerWidth, window.innerHeight) / 100;
+      const suelo = base + (rng() - 0.35) * 4 * vminPx;
+      const drop = Math.max(suelo - cy, 12);
       const swing = ((light ? 46 : 26) + rng() * (light ? 68 : 44)) * (rng() < 0.5 ? -1 : 1);
       const spin = (rng() < 0.5 ? -1 : 1) * ((light ? 320 : 200) + rng() * 280);
 
@@ -2055,20 +2084,27 @@ body {
       const porAncho = (vw * 0.92) / vmin;
       const k = Math.max(0.6, Math.min(1.45, Math.min(porAlto, porAncho)));
       document.documentElement.style.setProperty('--escena', k.toFixed(3));
+      /* altura realmente visible: en movil no coincide con 100vh */
+      document.documentElement.style.setProperty('--vph', vh + 'px');
     }
 
     function buildGarden() {
       const scales = [1, 0.97, 0.93, 1.06, 1.02];
+      /* en pantalla de movil se recorta el numero de piezas: la escena
+         llevaba 250 elementos con recorte y degradados propios */
+      const ligero = Math.min(window.innerWidth, window.innerHeight) < 620;
+      const textura = discTexture(1200, ligero);
       document.querySelectorAll('.flower__leafs').forEach((head, idx) => {
         const rng = mulberry32(9001 + idx * 7919);
         const disc = head.querySelector('.flower__white-circle');
         const k = scales[idx] || 1;
 
-        addRing(head, disc, rng, { count: 10, len: 9.8 * k, wid: 3.4 * k, tilt: 8, sepal: true });
-        addRing(head, disc, rng, { count: 17, len: 15.2 * k, wid: 5.1 * k, shade: 0.44, tilt: 26, z: 1, offset: 10.6 });
-        addRing(head, disc, rng, { count: 17, len: 14.3 * k, wid: 5.3 * k, shade: 0.04, tilt: 12, z: 2, offset: 0 });
+        const petalos = ligero ? 13 : 17;
+        addRing(head, disc, rng, { count: ligero ? 7 : 10, len: 9.8 * k, wid: 3.4 * k, tilt: 8, sepal: true });
+        addRing(head, disc, rng, { count: petalos, len: 15.2 * k, wid: 5.1 * k, shade: 0.44, tilt: 26, z: 1, offset: 180 / petalos });
+        addRing(head, disc, rng, { count: petalos, len: 14.3 * k, wid: 5.3 * k, shade: 0.04, tilt: 12, z: 2, offset: 0 });
 
-        if (disc) disc.style.backgroundImage = 'url(' + discTexture(1200 + idx * 37) + ')';
+        if (disc) disc.style.backgroundImage = 'url(' + textura + ')';
       });
 
       document.querySelectorAll('.flower__line__leaf').forEach((el, i) => {
@@ -2166,7 +2202,7 @@ body {
         window.water = water;
         window.flowerAt = flowerAt;
         clearTimeout(c);
-      }, 1000);
+      }, 150);
     };
   </script>
 </body>
