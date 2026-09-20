@@ -13,7 +13,16 @@
   box-sizing: border-box;
 }
 
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: transparent;
+}
+
 :root {
+  --escena: 0.9;
   --dark-color: #000;
   --fl-speed: 0.8s;
   --speed-leaf: 2s;
@@ -24,11 +33,16 @@ body {
   align-items: flex-end;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--dark-color);
   overflow: hidden;
   perspective: 1000px;
   cursor: pointer;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .night {
@@ -193,7 +207,7 @@ body {
 
 .flowers {
   position: relative;
-  transform: scale(0.9);
+  transform: scale(var(--escena, 0.9));
   z-index: 2;
 }
 
@@ -2029,6 +2043,20 @@ body {
       return false;
     }
 
+    /* La escena esta dibujada en vmin: en una pantalla alta y estrecha
+       se queda pequena abajo y en una baja y ancha se sale por arriba.
+       La escala se ajusta al hueco real, limitada por alto y por ancho
+       para que no se recorte por los lados. */
+    function fitScene() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const vmin = Math.min(vw, vh);
+      const porAlto = (vh * 0.94) / (vmin * 1.08);
+      const porAncho = (vw * 0.92) / vmin;
+      const k = Math.max(0.6, Math.min(1.45, Math.min(porAlto, porAncho)));
+      document.documentElement.style.setProperty('--escena', k.toFixed(3));
+    }
+
     function buildGarden() {
       const scales = [1, 0.97, 0.93, 1.06, 1.02];
       document.querySelectorAll('.flower__leafs').forEach((head, idx) => {
@@ -2064,7 +2092,16 @@ body {
     }
 
     onload = () => {
+      fitScene();
       buildGarden();
+
+      let ajuste = null;
+      const reajustar = () => {
+        clearTimeout(ajuste);
+        ajuste = setTimeout(fitScene, 120);
+      };
+      addEventListener('resize', reajustar);
+      addEventListener('orientationchange', reajustar);
 
       const c = setTimeout(() => {
         document.body.classList.remove("not-loaded");
